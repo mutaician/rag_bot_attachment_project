@@ -1,0 +1,6 @@
+@import "tailwindcss";
+
+/* Minimal base — app styling lives in Tailwind utility classes on components */
+body {
+  margin: 0;
+}
