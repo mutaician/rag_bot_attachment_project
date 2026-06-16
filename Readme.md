@@ -1,12 +1,18 @@
 # Interactive Internal Knowledge Base (RAG Bot)
 
-Monorepo: `server/` (FastAPI) + `client/` (React). Milestone 1 — mock API + frontend wired.
+Monorepo: `server/` (FastAPI) + `client/` (React). Milestone 2 — upload, ingest, index in Postgres.
 
-**Requires:** Python 3.12+, [uv](https://docs.astral.sh/uv/), Node 20+, [pnpm](https://pnpm.io/)
+**Requires:** Docker, Python 3.12+, [uv](https://docs.astral.sh/uv/), Node 20+, [pnpm](https://pnpm.io/), [Ollama](https://ollama.com/) with `embeddinggemma`
 
 ## Run
 
-**Backend** (terminal 1):
+**Database:**
+
+```bash
+docker compose up -d
+```
+
+**Backend** (terminal 1 — API + indexing worker):
 
 ```bash
 cd server && uv sync && uv run uvicorn app.main:app --reload --port 8000
@@ -18,11 +24,12 @@ cd server && uv sync && uv run uvicorn app.main:app --reload --port 8000
 cd client && pnpm install && pnpm dev
 ```
 
-- API: http://localhost:8000 (docs at `/docs`)
-- App: http://localhost:5173
+- App: http://localhost:5173 — upload PDF/md/txt, watch status go `pending` → `indexing` → `ready`
+- API docs: http://localhost:8000/docs
 
-API URL is set in `client/.env` (`VITE_API_URL=http://localhost:8000`).
+## Verify (Milestone 2)
 
-## Verify
-
-Open http://localhost:5173 → devtools console → should log `Mock documents: (3) [...]`.
+1. Open http://localhost:5173
+2. Drag a PDF onto the upload zone
+3. Status badge should become **ready** (Ollama must be running)
+4. `docker compose exec postgres psql -U rag_user -d rag_db -c "SELECT COUNT(*) FROM document_chunks;"`

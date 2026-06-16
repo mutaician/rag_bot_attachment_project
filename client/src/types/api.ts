@@ -12,6 +12,7 @@ export type DocumentStatus = "pending" | "indexing" | "ready" | "failed";
 export interface Document {
   id: string;
   filename: string;
+  version: number;
   status: DocumentStatus;
   /** ISO 8601 datetime string from the API, e.g. "2026-06-01T12:00:00Z" */
   updated_at: string;
@@ -41,4 +42,9 @@ export interface ChatResponse {
 /** Simple liveness check — confirms the API is running. */
 export interface HealthResponse {
   status: string;
+}
+
+/** Returned after a successful multipart upload. */
+export interface UploadResponse {
+  document_ids: string[];
 }

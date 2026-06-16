@@ -26,6 +26,7 @@ class Document(BaseModel):
 
     id: str
     filename: str
+    version: int
     status: DocumentStatus
     updated_at: datetime
 
@@ -57,3 +58,9 @@ class HealthResponse(BaseModel):
     """Simple liveness check — confirms the API is running."""
 
     status: str = "ok"
+
+
+class UploadResponse(BaseModel):
+    """Returned after a successful multipart upload."""
+
+    document_ids: list[str]

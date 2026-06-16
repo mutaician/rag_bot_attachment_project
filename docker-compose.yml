@@ -1,0 +1,33 @@
+# Docker Compose — runs PostgreSQL + pgvector in a container.
+# You do NOT need Postgres installed on your laptop; only Docker.
+#
+# Start:  docker compose up -d
+# Stop:   docker compose down
+# Logs:   docker compose logs postgres
+#
+# Postgres data persists in the named volume `rag_pgdata` between restarts.
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: rag_postgres
+    restart: unless-stopped
+
+    environment:
+      # Credentials for local dev only — not for production
+      POSTGRES_USER: rag_user
+      POSTGRES_PASSWORD: rag_password
+      POSTGRES_DB: rag_db
+
+    ports:
+      # host:container — FastAPI connects to localhost:5432
+      - "5432:5432"
+
+    volumes:
+      # Named volume keeps your data when the container is recreated
+      - rag_pgdata:/var/lib/postgresql/data
+      # SQL files here run once on first startup (creates tables) — added in next step
+      - ./server/db/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+
+volumes:
+  rag_pgdata:
