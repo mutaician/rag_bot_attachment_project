@@ -1,6 +1,55 @@
 @import "tailwindcss";
 
-/* Minimal base — app styling lives in Tailwind utility classes on components */
+/* Light — default “Index” palette */
+@theme {
+  --color-paper: #f4f1ea;
+  --color-paper-deep: #ebe6dc;
+  --color-ink: #1c1916;
+  --color-muted: #6f6860;
+  --color-faint: #9c948a;
+  --color-line: #d8d2c8;
+  --color-accent: #9a4f12;
+  --color-accent-hover: #7d3f0e;
+  --color-accent-soft: #f0e4d4;
+  --color-surface: #faf8f4;
+  --font-display: "Source Serif 4", Georgia, "Times New Roman", serif;
+  --font-body: "IBM Plex Sans", system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, monospace;
+}
+
+/* Dark — same warm ink-on-paper idea, inverted */
+[data-theme='dark'] {
+  --color-paper: #131110;
+  --color-paper-deep: #1b1917;
+  --color-ink: #e9e5dd;
+  --color-muted: #a8a198;
+  --color-faint: #6e6860;
+  --color-line: #2c2824;
+  --color-accent: #c87a2e;
+  --color-accent-hover: #db8b3c;
+  --color-accent-soft: #2a2118;
+  --color-surface: #1a1715;
+  color-scheme: dark;
+}
+
+[data-theme='light'] {
+  color-scheme: light;
+}
+
 body {
   margin: 0;
+  font-family: var(--font-body);
+  background-color: var(--color-paper);
+  color: var(--color-ink);
+  -webkit-font-smoothing: antialiased;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }

@@ -9,3 +9,7 @@ docker compose down -v     # Stop AND delete volume (wipes database)
 docker compose exec postgres psql -U rag_user -d rag_db
 
 ```
+
+when db is reset
+```bash
+docker compose exec -T postgres psql -U rag_user -d rag_db < server/db/migrations/001_conversations.sql```

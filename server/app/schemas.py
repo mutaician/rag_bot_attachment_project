@@ -54,6 +54,35 @@ class ChatResponse(BaseModel):
     citations: list[Citation]
 
 
+class ConversationSummary(BaseModel):
+    """One row in the conversation list."""
+
+    id: str
+    title: str
+    created_at: datetime
+    updated_at: datetime
+
+
+class ConversationMessage(BaseModel):
+    """A single message in a conversation thread."""
+
+    id: str
+    role: str
+    content: str
+    citations: list[Citation] | None = None
+    created_at: datetime
+
+
+class ConversationDetail(BaseModel):
+    """Full conversation with message history."""
+
+    id: str
+    title: str
+    created_at: datetime
+    updated_at: datetime
+    messages: list[ConversationMessage]
+
+
 class HealthResponse(BaseModel):
     """Simple liveness check — confirms the API is running."""
 

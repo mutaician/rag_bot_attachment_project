@@ -12,9 +12,17 @@ from typing import Iterator
 from uuid import UUID, uuid4
 
 import psycopg
+from psycopg.types.json import Json
 
 from app.config import settings
-from app.schemas import Document, DocumentStatus
+from app.schemas import (
+    Citation,
+    ConversationDetail,
+    ConversationMessage,
+    ConversationSummary,
+    Document,
+    DocumentStatus,
+)
 
 
 def _archived_db_filename(document_id: str, original_filename: str) -> str:
@@ -363,3 +371,180 @@ def finish_job(job_id: str, status: str) -> None:
                 (status, job_id),
             )
         conn.commit()
+
+
+# --- Conversations (Milestone 3) ---
+
+
+def _title_from_message(message: str) -> str:
+    text = message.strip().replace("\n", " ")
+    if len(text) <= 80:
+        return text or "New conversation"
+    return text[:77] + "..."
+
+
+def create_conversation(first_user_message: str | None = None) -> str:
+    """Create a conversation; optional first message sets the title."""
+    conv_id = uuid4()
+    title = (
+        _title_from_message(first_user_message)
+        if first_user_message
+        else "New conversation"
+    )
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                INSERT INTO conversations (id, title)
+                VALUES (%s, %s)
+                """,
+                (conv_id, title),
+            )
+        conn.commit()
+    return str(conv_id)
+
+
+def list_conversations() -> list[ConversationSummary]:
+    """All conversations, most recently updated first."""
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT id, title, created_at, updated_at
+                FROM conversations
+                ORDER BY updated_at DESC
+                """
+            )
+            rows = cur.fetchall()
+
+    return [
+        ConversationSummary(
+            id=str(row[0]),
+            title=row[1],
+            created_at=row[2],
+            updated_at=row[3],
+        )
+        for row in rows
+    ]
+
+
+def _parse_citations(raw: object) -> list[Citation] | None:
+    if raw is None:
+        return None
+    if isinstance(raw, list):
+        return [Citation(**item) for item in raw]
+    return None
+
+
+def get_conversation(conversation_id: str) -> ConversationDetail | None:
+    """Load a conversation and its messages, or None if missing."""
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT id, title, created_at, updated_at
+                FROM conversations
+                WHERE id = %s
+                """,
+                (conversation_id,),
+            )
+            row = cur.fetchone()
+            if row is None:
+                return None
+
+            cur.execute(
+                """
+                SELECT id, role, content, citations, created_at
+                FROM conversation_messages
+                WHERE conversation_id = %s
+                ORDER BY created_at ASC
+                """,
+                (conversation_id,),
+            )
+            msg_rows = cur.fetchall()
+
+    messages = [
+        ConversationMessage(
+            id=str(m[0]),
+            role=m[1],
+            content=m[2],
+            citations=_parse_citations(m[3]),
+            created_at=m[4],
+        )
+        for m in msg_rows
+    ]
+
+    return ConversationDetail(
+        id=str(row[0]),
+        title=row[1],
+        created_at=row[2],
+        updated_at=row[3],
+        messages=messages,
+    )
+
+
+def delete_conversation(conversation_id: str) -> bool:
+    """Permanently delete a conversation and its messages."""
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute("DELETE FROM conversations WHERE id = %s", (conversation_id,))
+            deleted = cur.rowcount > 0
+        conn.commit()
+    return deleted
+
+
+def append_message(
+    conversation_id: str,
+    role: str,
+    content: str,
+    citations: list[Citation] | None = None,
+) -> str:
+    """Append a user or assistant message; returns message id."""
+    msg_id = uuid4()
+    citations_json = (
+        Json([c.model_dump(mode="json") for c in citations]) if citations else None
+    )
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                INSERT INTO conversation_messages (
+                    id, conversation_id, role, content, citations
+                )
+                VALUES (%s, %s, %s, %s, %s)
+                """,
+                (msg_id, conversation_id, role, content, citations_json),
+            )
+            cur.execute(
+                """
+                UPDATE conversations
+                SET updated_at = NOW()
+                WHERE id = %s
+                """,
+                (conversation_id,),
+            )
+        conn.commit()
+    return str(msg_id)
+
+
+def get_chat_history(conversation_id: str) -> list[dict[str, str]]:
+    """
+    User/assistant turns for the Ollama agent (ordered oldest first).
+
+    Tool rounds are not persisted — each new user message starts a fresh agent run.
+    """
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT role, content
+                FROM conversation_messages
+                WHERE conversation_id = %s
+                  AND role IN ('user', 'assistant')
+                ORDER BY created_at ASC
+                """,
+                (conversation_id,),
+            )
+            rows = cur.fetchall()
+
+    return [{"role": row[0], "content": row[1]} for row in rows]

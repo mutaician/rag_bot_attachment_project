@@ -1,44 +1,82 @@
-import { BrowserRouter, NavLink, Route, Routes } from 'react-router-dom'
+import { BrowserRouter, NavLink, Route, Routes, useLocation } from 'react-router-dom'
+import ThemeToggle from './components/ThemeToggle'
 import Dashboard from './pages/Dashboard'
 import Chat from './pages/Chat'
 
-/**
- * App shell — shared layout + client-side routing.
- * BrowserRouter keeps the URL in sync with the visible page (no full reload).
- */
-export default function App() {
+function AppShell() {
+  const location = useLocation()
+  const onAsk = location.pathname === '/chat' || location.pathname.startsWith('/chat/')
+
   return (
-    <BrowserRouter>
-      <div className="min-h-screen bg-gray-950 text-gray-100">
-        <header className="border-b border-gray-800 px-6 py-4">
-          <nav className="mx-auto flex max-w-4xl items-center gap-6">
-            <span className="font-semibold">Knowledge Base</span>
+    <div className="flex min-h-screen bg-paper text-ink">
+      <aside className="sticky top-0 flex h-screen w-14 shrink-0 flex-col border-r border-line bg-surface md:w-48">
+          <div className="border-b border-line px-3 py-5 md:px-5">
+            <p className="font-display text-lg font-semibold leading-none tracking-tight md:text-xl">
+              Index
+            </p>
+            <p className="mt-1 hidden font-mono text-[10px] uppercase tracking-[0.12em] text-faint md:block">
+              Internal KB
+            </p>
+          </div>
+
+          <nav className="flex flex-1 flex-col gap-1 p-2 md:p-3">
             <NavLink
               to="/"
+              end
               className={({ isActive }) =>
-                isActive ? 'text-white' : 'text-gray-400 hover:text-gray-200'
+                [
+                  'rounded-md px-3 py-2.5 text-sm transition-colors',
+                  'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent',
+                  isActive
+                    ? 'bg-accent-soft font-medium text-ink'
+                    : 'text-muted hover:bg-paper-deep hover:text-ink',
+                ].join(' ')
               }
             >
-              Documents
+              <span className="md:hidden" aria-hidden>
+                ◫
+              </span>
+              <span className="hidden md:inline">Library</span>
             </NavLink>
             <NavLink
               to="/chat"
-              className={({ isActive }) =>
-                isActive ? 'text-white' : 'text-gray-400 hover:text-gray-200'
+              className={() =>
+                [
+                  'rounded-md px-3 py-2.5 text-sm transition-colors',
+                  'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent',
+                  onAsk
+                    ? 'bg-accent-soft font-medium text-ink'
+                    : 'text-muted hover:bg-paper-deep hover:text-ink',
+                ].join(' ')
               }
             >
-              Chat
+              <span className="md:hidden" aria-hidden>
+                ◎
+              </span>
+              <span className="hidden md:inline">Ask</span>
             </NavLink>
           </nav>
-        </header>
 
-        <main className="mx-auto max-w-4xl px-6 py-8">
+          <div className="border-t border-line p-2 md:p-3">
+            <ThemeToggle />
+          </div>
+        </aside>
+
+        <main className="min-w-0 flex-1">
           <Routes>
             <Route path="/" element={<Dashboard />} />
             <Route path="/chat" element={<Chat />} />
+            <Route path="/chat/:conversationId" element={<Chat />} />
           </Routes>
         </main>
       </div>
+  )
+}
+
+export default function App() {
+  return (
+    <BrowserRouter>
+      <AppShell />
     </BrowserRouter>
   )
 }

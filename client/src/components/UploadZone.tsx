@@ -7,9 +7,6 @@ interface UploadZoneProps {
   disabled?: boolean
 }
 
-/**
- * Drag-and-drop + click-to-browse file upload area.
- */
 export default function UploadZone({ onUpload, disabled }: UploadZoneProps) {
   const inputRef = useRef<HTMLInputElement>(null)
   const [dragOver, setDragOver] = useState(false)
@@ -36,10 +33,11 @@ export default function UploadZone({ onUpload, disabled }: UploadZoneProps) {
         void handleFiles(e.dataTransfer.files)
       }}
       className={[
-        'cursor-pointer rounded-lg border-2 border-dashed px-6 py-10 text-center transition-colors',
+        'cursor-pointer border border-dashed px-6 py-12 text-center transition-colors',
+        'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent',
         dragOver
-          ? 'border-white bg-gray-800'
-          : 'border-gray-700 bg-gray-900 hover:border-gray-500',
+          ? 'border-accent bg-accent-soft'
+          : 'border-line bg-paper hover:border-faint',
         disabled ? 'pointer-events-none opacity-50' : '',
       ].join(' ')}
     >
@@ -51,10 +49,10 @@ export default function UploadZone({ onUpload, disabled }: UploadZoneProps) {
         className="hidden"
         onChange={(e) => void handleFiles(e.target.files)}
       />
-      <p className="font-medium text-gray-200">
-        Drop files here or click to browse
+      <p className="font-display text-lg text-ink">Add to library</p>
+      <p className="mt-2 text-sm text-muted">
+        Drop files here or click to browse — PDF, Markdown, plain text
       </p>
-      <p className="mt-1 text-sm text-gray-500">PDF, Markdown, or plain text</p>
     </div>
   )
 }
