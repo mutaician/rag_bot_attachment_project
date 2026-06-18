@@ -15,6 +15,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.routers import chat, documents
 from app.schemas import HealthResponse
+from app.llm.ollama_client import log_llm_config
 from app.worker import start_background_worker
 
 logging.basicConfig(
@@ -31,6 +32,7 @@ async def lifespan(app: FastAPI):
 
     Starts the indexing worker thread when the server boots.
     """
+    log_llm_config()
     worker_thread, stop_event = start_background_worker()
     yield
     stop_event.set()
