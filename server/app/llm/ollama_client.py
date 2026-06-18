@@ -39,18 +39,21 @@ def get_chat_client() -> Client:
 
 
 def get_chat_model() -> str:
-    """Model name passed to Client.chat() — OLLAMA_CHAT_MODEL."""
-    return settings.ollama_chat_model
+    """Model for Client.chat() — local vs cloud name from settings."""
+    if settings.ollama_llm_mode == "cloud":
+        return settings.ollama_cloud_chat_model
+    return settings.ollama_local_chat_model
 
 
 def log_llm_config() -> None:
     """Log LLM mode at startup; warn on missing cloud key or embed host."""
+    model = get_chat_model()
     if settings.ollama_llm_mode == "cloud":
         if settings.ollama_cloud_api_key:
             logger.info(
                 "Chat LLM: cloud (%s, model=%s)",
                 settings.ollama_cloud_base_url,
-                settings.ollama_chat_model,
+                model,
             )
         else:
             logger.warning(
@@ -61,7 +64,7 @@ def log_llm_config() -> None:
         logger.info(
             "Chat LLM: local (%s, model=%s)",
             settings.ollama_base_url,
-            settings.ollama_chat_model,
+            model,
         )
 
     logger.info(

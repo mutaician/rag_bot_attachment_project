@@ -22,11 +22,10 @@ export default function Dashboard() {
       setDocuments(data)
       setError(null)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load documents')
+      setError(err instanceof Error ? err.message : 'Could not load library')
     }
   }, [])
 
-  // Load on mount + poll so status updates while worker runs
   useEffect(() => {
     void refresh()
     const id = setInterval(() => void refresh(), POLL_MS)
@@ -53,7 +52,7 @@ export default function Dashboard() {
       await deleteDocument(id)
       await refresh()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Delete failed')
+      setError(err instanceof Error ? err.message : 'Could not remove file')
     } finally {
       setDeletingId(null)
     }
@@ -64,39 +63,48 @@ export default function Dashboard() {
   )
 
   return (
-    <div className="space-y-8">
-      <div>
-        <h1 className="text-2xl font-semibold text-gray-100">Documents</h1>
-        <p className="mt-1 text-sm text-gray-500">
-          Upload files here — indexing runs automatically in the background.
+    <div className="px-5 py-8 md:px-10 md:py-10">
+      <header className="max-w-2xl">
+        <h1 className="font-display text-3xl font-semibold tracking-tight">
+          Library
+        </h1>
+        <p className="mt-2 text-sm leading-relaxed text-muted">
+          Add PDFs and text files here. Each upload is indexed for search in Ask.
           {isIndexing && (
-            <span className="ml-1 text-blue-400">Refreshing status…</span>
+            <span className="ml-2 font-mono text-xs text-accent">
+              Indexing in progress
+            </span>
           )}
         </p>
+      </header>
+
+      <div className="mt-8 max-w-2xl space-y-8">
+        <UploadZone onUpload={handleUpload} disabled={uploading} />
+
+        {uploading && (
+          <p className="font-mono text-xs text-faint">Uploading files…</p>
+        )}
+
+        {error && (
+          <p
+            role="alert"
+            className="border border-accent/30 bg-accent-soft px-3 py-2 text-sm text-accent"
+          >
+            {error}
+          </p>
+        )}
+
+        <section>
+          <h2 className="mb-3 font-mono text-[11px] font-medium uppercase tracking-[0.14em] text-faint">
+            On file
+          </h2>
+          <DocumentList
+            documents={documents}
+            onDelete={handleDelete}
+            deletingId={deletingId}
+          />
+        </section>
       </div>
-
-      <UploadZone onUpload={handleUpload} disabled={uploading} />
-
-      {uploading && (
-        <p className="text-sm text-gray-400">Uploading…</p>
-      )}
-
-      {error && (
-        <p className="rounded-md border border-red-900 bg-red-950 px-3 py-2 text-sm text-red-300">
-          {error}
-        </p>
-      )}
-
-      <section>
-        <h2 className="mb-3 text-sm font-medium uppercase tracking-wide text-gray-500">
-          Library
-        </h2>
-        <DocumentList
-          documents={documents}
-          onDelete={handleDelete}
-          deletingId={deletingId}
-        />
-      </section>
     </div>
   )
 }

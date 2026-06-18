@@ -33,11 +33,13 @@ export interface ChatRequest {
   conversation_id?: string | null;
 }
 
-/** Non-streaming chat reply (Milestone 1 mock; streaming added in M3). */
-export interface ChatResponse {
-  answer: string;
-  citations: Citation[];
-}
+/** SSE events from POST /chat */
+export type ChatStreamEvent =
+  | { type: 'token'; content: string }
+  | { type: 'tool'; name: string; status: string; query?: string }
+  | { type: 'citations'; citations: Citation[] }
+  | { type: 'done'; conversation_id: string }
+  | { type: 'error'; message: string };
 
 /** Simple liveness check — confirms the API is running. */
 export interface HealthResponse {
@@ -47,4 +49,30 @@ export interface HealthResponse {
 /** Returned after a successful multipart upload. */
 export interface UploadResponse {
   document_ids: string[];
+}
+
+/** One row in the conversation sidebar / list. */
+export interface ConversationSummary {
+  id: string;
+  title: string;
+  created_at: string;
+  updated_at: string;
+}
+
+/** A single message in a conversation thread. */
+export interface ConversationMessage {
+  id: string;
+  role: string;
+  content: string;
+  citations?: Citation[] | null;
+  created_at: string;
+}
+
+/** Full conversation with message history. */
+export interface ConversationDetail {
+  id: string;
+  title: string;
+  created_at: string;
+  updated_at: string;
+  messages: ConversationMessage[];
 }

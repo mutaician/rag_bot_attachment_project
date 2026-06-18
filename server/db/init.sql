@@ -56,3 +56,25 @@ CREATE TABLE indexing_jobs (
 CREATE INDEX indexing_jobs_pending_idx
     ON indexing_jobs (status)
     WHERE status = 'pending';
+
+-- ---------------------------------------------------------------------------
+-- conversations + messages (Milestone 3 chat history)
+-- ---------------------------------------------------------------------------
+CREATE TABLE conversations (
+    id          UUID PRIMARY KEY,
+    title       TEXT NOT NULL DEFAULT 'New conversation',
+    created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE conversation_messages (
+    id               UUID PRIMARY KEY,
+    conversation_id  UUID NOT NULL REFERENCES conversations(id) ON DELETE CASCADE,
+    role             TEXT NOT NULL,   -- user | assistant
+    content          TEXT NOT NULL,
+    citations        JSONB,           -- assistant messages only
+    created_at       TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX conversation_messages_conversation_idx
+    ON conversation_messages (conversation_id, created_at);
