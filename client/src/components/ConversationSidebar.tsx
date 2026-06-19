@@ -73,6 +73,11 @@ export default function ConversationSidebar({
                   ].join(' ')}
                 >
                   <span className="line-clamp-2 text-sm leading-snug">{c.title}</span>
+                  {c.started_by && (
+                    <span className="mt-0.5 block text-[10px] text-faint">
+                      {c.started_by.display_name}
+                    </span>
+                  )}
                   <span className="mt-1 block font-mono text-[10px] text-faint">
                     {formatWhen(c.updated_at)}
                   </span>

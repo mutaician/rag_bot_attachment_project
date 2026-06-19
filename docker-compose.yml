@@ -1,33 +1,78 @@
-# Docker Compose — runs PostgreSQL + pgvector in a container.
-# You do NOT need Postgres installed on your laptop; only Docker.
+# Docker Compose — local dev (postgres only) or full stack (profile: full).
 #
-# Start:  docker compose up -d
-# Stop:   docker compose down
-# Logs:   docker compose logs postgres
+# Postgres only (local API + Vite dev):
+#   docker compose up -d
 #
-# Postgres data persists in the named volume `rag_pgdata` between restarts.
+# Full stack (postgres + ollama + api + nginx web):
+#   docker compose --profile full up -d --build
+#
+# Apply migrations on an existing DB volume:
+#   docker compose exec -T postgres psql -U rag_user -d rag_db < server/db/migrations/002_users_sessions.sql
+#   docker compose exec -T postgres psql -U rag_user -d rag_db < server/db/migrations/003_chat_attribution.sql
 
 services:
   postgres:
     image: pgvector/pgvector:pg16
     container_name: rag_postgres
     restart: unless-stopped
-
     environment:
-      # Credentials for local dev only — not for production
       POSTGRES_USER: rag_user
       POSTGRES_PASSWORD: rag_password
       POSTGRES_DB: rag_db
-
     ports:
-      # host:container — FastAPI connects to localhost:5432
       - "5432:5432"
-
     volumes:
-      # Named volume keeps your data when the container is recreated
       - rag_pgdata:/var/lib/postgresql/data
-      # SQL files here run once on first startup (creates tables) — added in next step
       - ./server/db/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U rag_user -d rag_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  ollama:
+    profiles: [full]
+    image: ollama/ollama:latest
+    container_name: rag_ollama
+    restart: unless-stopped
+    volumes:
+      - rag_ollama:/root/.ollama
+
+  api:
+    profiles: [full]
+    build: ./server
+    container_name: rag_api
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql://rag_user:rag_password@postgres:5432/rag_db
+      OLLAMA_BASE_URL: http://ollama:11434
+      OLLAMA_EMBED_MODEL: embeddinggemma:latest
+      OLLAMA_LLM_MODE: local
+      OLLAMA_LOCAL_CHAT_MODEL: gemma4
+      SESSION_SECRET: change-me-in-production
+      COOKIE_SECURE: "false"
+    volumes:
+      - rag_uploads:/app/data/uploads
+    depends_on:
+      postgres:
+        condition: service_healthy
+      ollama:
+        condition: service_started
+
+  web:
+    profiles: [full]
+    build:
+      context: ./client
+      args:
+        VITE_API_URL: ""
+    container_name: rag_web
+    restart: unless-stopped
+    ports:
+      - "8080:80"
+    depends_on:
+      - api
 
 volumes:
   rag_pgdata:
+  rag_ollama:
+  rag_uploads:

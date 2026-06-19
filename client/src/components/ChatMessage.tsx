@@ -1,5 +1,6 @@
 import type { Citation } from '../types/api'
 import CitationCard from './CitationCard'
+import MarkdownContent from './MarkdownContent'
 
 export interface ChatMessageData {
   id: string
@@ -7,6 +8,7 @@ export interface ChatMessageData {
   content: string
   citations?: Citation[]
   streaming?: boolean
+  authorName?: string
 }
 
 interface ChatMessageProps {
@@ -18,7 +20,12 @@ export default function ChatMessage({ message }: ChatMessageProps) {
 
   if (isUser) {
     return (
-      <div className="flex justify-end">
+      <div className="flex flex-col items-end gap-1">
+        {message.authorName && (
+          <span className="font-mono text-[10px] uppercase tracking-[0.1em] text-faint">
+            {message.authorName}
+          </span>
+        )}
         <div className="max-w-[90%] border border-line bg-surface px-4 py-3 text-sm leading-relaxed text-ink">
           {message.content}
         </div>
@@ -28,15 +35,13 @@ export default function ChatMessage({ message }: ChatMessageProps) {
 
   return (
     <article className="max-w-none">
-      <p className="whitespace-pre-wrap text-sm leading-[1.65] text-ink">
-        {message.content}
-        {message.streaming && (
-          <span
-            className="ml-0.5 inline-block h-[1em] w-0.5 animate-pulse bg-accent align-middle"
-            aria-hidden
-          />
-        )}
-      </p>
+      <MarkdownContent content={message.content} />
+      {message.streaming && (
+        <span
+          className="ml-0.5 inline-block h-[1em] w-0.5 animate-pulse bg-accent align-middle"
+          aria-hidden
+        />
+      )}
 
       {message.citations && message.citations.length > 0 && (
         <footer className="mt-5 space-y-3 border-t border-line pt-4">

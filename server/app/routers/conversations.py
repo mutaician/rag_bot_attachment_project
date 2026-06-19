@@ -4,12 +4,17 @@ Conversation list and history endpoints (Milestone 3).
 
 from uuid import UUID
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 
 from app import db
+from app.auth.deps import get_current_user
 from app.schemas import ConversationDetail, ConversationSummary
 
-router = APIRouter(prefix="/conversations", tags=["conversations"])
+router = APIRouter(
+    prefix="/conversations",
+    tags=["conversations"],
+    dependencies=[Depends(get_current_user)],
+)
 
 
 def _parse_conversation_id(conversation_id: str) -> str:
