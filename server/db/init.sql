@@ -58,21 +58,45 @@ CREATE INDEX indexing_jobs_pending_idx
     WHERE status = 'pending';
 
 -- ---------------------------------------------------------------------------
--- conversations + messages (Milestone 3 chat history)
+-- users + sessions (auth)
+-- ---------------------------------------------------------------------------
+CREATE TABLE users (
+    id            UUID PRIMARY KEY,
+    username      TEXT NOT NULL UNIQUE,
+    display_name  TEXT NOT NULL,
+    password_hash TEXT NOT NULL,
+    is_active     BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE sessions (
+    id            UUID PRIMARY KEY,
+    user_id       UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    token_hash    TEXT NOT NULL UNIQUE,
+    expires_at    TIMESTAMPTZ NOT NULL,
+    created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX sessions_token_hash_idx ON sessions (token_hash);
+
+-- ---------------------------------------------------------------------------
+-- conversations + messages (team-shared, with attribution)
 -- ---------------------------------------------------------------------------
 CREATE TABLE conversations (
-    id          UUID PRIMARY KEY,
-    title       TEXT NOT NULL DEFAULT 'New conversation',
-    created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    id                   UUID PRIMARY KEY,
+    title                TEXT NOT NULL DEFAULT 'New conversation',
+    started_by_user_id   UUID REFERENCES users(id),
+    created_at           TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at           TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 CREATE TABLE conversation_messages (
     id               UUID PRIMARY KEY,
     conversation_id  UUID NOT NULL REFERENCES conversations(id) ON DELETE CASCADE,
-    role             TEXT NOT NULL,   -- user | assistant
+    role             TEXT NOT NULL,
     content          TEXT NOT NULL,
-    citations        JSONB,           -- assistant messages only
+    citations        JSONB,
+    author_user_id   UUID REFERENCES users(id),
     created_at       TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 

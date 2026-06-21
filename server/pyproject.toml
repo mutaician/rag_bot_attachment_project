@@ -8,6 +8,7 @@ version = "0.1.0"
 description = "FastAPI backend for the RAG knowledge base"
 requires-python = ">=3.12"
 dependencies = [
+    "bcrypt>=5.0.0",
     "fastapi>=0.136.3",           # web framework + automatic OpenAPI docs
     "httpx>=0.28.1",
     "ollama>=0.6.2",

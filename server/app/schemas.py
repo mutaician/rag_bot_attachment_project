@@ -54,6 +54,14 @@ class ChatResponse(BaseModel):
     citations: list[Citation]
 
 
+class UserRef(BaseModel):
+    """Lightweight user reference for attribution."""
+
+    id: str
+    username: str
+    display_name: str
+
+
 class ConversationSummary(BaseModel):
     """One row in the conversation list."""
 
@@ -61,6 +69,7 @@ class ConversationSummary(BaseModel):
     title: str
     created_at: datetime
     updated_at: datetime
+    started_by: UserRef | None = None
 
 
 class ConversationMessage(BaseModel):
@@ -71,6 +80,7 @@ class ConversationMessage(BaseModel):
     content: str
     citations: list[Citation] | None = None
     created_at: datetime
+    author: UserRef | None = None
 
 
 class ConversationDetail(BaseModel):
@@ -80,6 +90,7 @@ class ConversationDetail(BaseModel):
     title: str
     created_at: datetime
     updated_at: datetime
+    started_by: UserRef | None = None
     messages: list[ConversationMessage]
 
 
@@ -93,3 +104,29 @@ class UploadResponse(BaseModel):
     """Returned after a successful multipart upload."""
 
     document_ids: list[str]
+
+
+class LoginRequest(BaseModel):
+    username: str = Field(..., min_length=1)
+    password: str = Field(..., min_length=1)
+
+
+class AuthUser(BaseModel):
+    id: str
+    username: str
+    display_name: str
+
+
+class LlmModeResponse(BaseModel):
+    mode: str
+
+
+class LlmModeRequest(BaseModel):
+    mode: str = Field(..., pattern="^(local|cloud)$")
+
+
+class SystemCapabilities(BaseModel):
+    embed: bool
+    local_chat: bool
+    cloud_chat: bool
+    cloud_configured: bool

@@ -8,12 +8,13 @@ Starts the HTTP API and the background indexing worker in one process.
 """
 
 import logging
+import os
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.routers import chat, conversations, documents
+from app.routers import auth, chat, conversations, documents, system
 from app.schemas import HealthResponse
 from app.llm.ollama_client import log_llm_config
 from app.worker import start_background_worker
@@ -23,6 +24,11 @@ logging.basicConfig(
     format="%(asctime)s [%(name)s] %(message)s",
     datefmt="%H:%M:%S",
 )
+
+
+def _cors_origins() -> list[str]:
+    raw = os.getenv("CORS_ORIGINS", "http://localhost:5173")
+    return [origin.strip() for origin in raw.split(",") if origin.strip()]
 
 
 @asynccontextmanager
@@ -47,7 +53,7 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"],
+    allow_origins=_cors_origins(),
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -60,6 +66,8 @@ def health() -> HealthResponse:
     return HealthResponse()
 
 
+app.include_router(auth.router)
 app.include_router(documents.router)
 app.include_router(conversations.router)
 app.include_router(chat.router)
+app.include_router(system.router)

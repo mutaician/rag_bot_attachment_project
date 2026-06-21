@@ -9,12 +9,15 @@ import {
 import type { Citation, ConversationSummary } from '../types/api'
 import ChatMessage, { type ChatMessageData } from '../components/ChatMessage'
 import ConversationSidebar from '../components/ConversationSidebar'
+import LlmModeToggle from '../components/LlmModeToggle'
+import { useAuth } from '../context/AuthContext'
 
 function newId() {
   return crypto.randomUUID()
 }
 
 export default function Chat() {
+  const { user } = useAuth()
   const { conversationId: routeId } = useParams()
   const navigate = useNavigate()
 
@@ -25,6 +28,7 @@ export default function Chat() {
   const [loading, setLoading] = useState(false)
   const [status, setStatus] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [threadMeta, setThreadMeta] = useState<{ startedBy?: string } | null>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
 
   const activeId = routeId ?? null
@@ -44,12 +48,17 @@ export default function Chat() {
     setError(null)
     try {
       const detail = await getConversation(id)
+      setThreadMeta({
+        startedBy: detail.started_by?.display_name,
+      })
       setMessages(
         detail.messages.map((m) => ({
           id: m.id,
           role: m.role as 'user' | 'assistant',
           content: m.content,
           citations: m.citations ?? undefined,
+          authorName:
+            m.role === 'user' ? m.author?.display_name ?? undefined : undefined,
         })),
       )
     } catch (err) {
@@ -67,6 +76,7 @@ export default function Chat() {
       void loadConversation(routeId)
     } else {
       setMessages([])
+      setThreadMeta(null)
     }
   }, [routeId, loadConversation])
 
@@ -77,6 +87,7 @@ export default function Chat() {
   function handleNewChat() {
     navigate('/chat')
     setMessages([])
+    setThreadMeta(null)
     setError(null)
     setStatus(null)
   }
@@ -111,7 +122,12 @@ export default function Chat() {
 
     setMessages((prev) => [
       ...prev,
-      { id: userMsgId, role: 'user', content: text },
+      {
+        id: userMsgId,
+        role: 'user',
+        content: text,
+        authorName: user?.display_name,
+      },
       { id: assistantMsgId, role: 'assistant', content: '', streaming: true },
     ])
 
@@ -183,6 +199,12 @@ export default function Chat() {
           <p className="mt-0.5 text-sm text-muted">
             Questions are answered only from documents in your library.
           </p>
+          {threadMeta?.startedBy && (
+            <p className="mt-1 font-mono text-[10px] uppercase tracking-[0.1em] text-faint">
+              Started by {threadMeta.startedBy}
+            </p>
+          )}
+          <LlmModeToggle />
         </header>
 
         {error && (

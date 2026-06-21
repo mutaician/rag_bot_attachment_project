@@ -7,13 +7,18 @@ Milestone 2: PostgreSQL-backed uploads with filename versioning.
 from pathlib import Path
 from uuid import UUID, uuid4
 
-from fastapi import APIRouter, File, HTTPException, Query, UploadFile
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
 
 from app import db
+from app.auth.deps import get_current_user
 from app.config import settings
 from app.schemas import Document, UploadResponse
 
-router = APIRouter(prefix="/documents", tags=["documents"])
+router = APIRouter(
+    prefix="/documents",
+    tags=["documents"],
+    dependencies=[Depends(get_current_user)],
+)
 
 # Allowed extensions for Milestone 2 (PDF + plain text formats)
 ALLOWED_SUFFIXES = {".pdf", ".txt", ".md"}

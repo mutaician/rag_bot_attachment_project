@@ -6,6 +6,7 @@ Each function opens a connection, runs SQL, and returns plain Python types.
 """
 
 from contextlib import contextmanager
+from datetime import datetime, timedelta, timezone
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterator
@@ -22,6 +23,7 @@ from app.schemas import (
     ConversationSummary,
     Document,
     DocumentStatus,
+    UserRef,
 )
 
 
@@ -373,6 +375,124 @@ def finish_job(job_id: str, status: str) -> None:
         conn.commit()
 
 
+# --- Auth ---
+
+
+def _user_ref_from_row(
+    user_id: object | None,
+    username: str | None,
+    display_name: str | None,
+) -> UserRef | None:
+    if user_id is None:
+        return None
+    return UserRef(
+        id=str(user_id),
+        username=username or "",
+        display_name=display_name or "",
+    )
+
+
+def create_user(username: str, display_name: str, password_hash: str) -> str:
+    """Insert a new user; returns user id."""
+    user_id = uuid4()
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                INSERT INTO users (id, username, display_name, password_hash)
+                VALUES (%s, %s, %s, %s)
+                """,
+                (user_id, username, display_name, password_hash),
+            )
+        conn.commit()
+    return str(user_id)
+
+
+def get_user_by_username(username: str) -> dict | None:
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT id, username, display_name, password_hash, is_active
+                FROM users
+                WHERE username = %s
+                """,
+                (username,),
+            )
+            row = cur.fetchone()
+    if row is None:
+        return None
+    return {
+        "id": str(row[0]),
+        "username": row[1],
+        "display_name": row[2],
+        "password_hash": row[3],
+        "is_active": row[4],
+    }
+
+
+def get_user_by_session_hash(token_hash: str) -> dict | None:
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT u.id, u.username, u.display_name
+                FROM sessions s
+                INNER JOIN users u ON u.id = s.user_id
+                WHERE s.token_hash = %s
+                  AND s.expires_at > NOW()
+                  AND u.is_active = TRUE
+                """,
+                (token_hash,),
+            )
+            row = cur.fetchone()
+    if row is None:
+        return None
+    return {
+        "id": str(row[0]),
+        "username": row[1],
+        "display_name": row[2],
+    }
+
+
+def create_session(user_id: str, token_hash: str, expires_at: datetime) -> str:
+    session_id = uuid4()
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                INSERT INTO sessions (id, user_id, token_hash, expires_at)
+                VALUES (%s, %s, %s, %s)
+                """,
+                (session_id, user_id, token_hash, expires_at),
+            )
+        conn.commit()
+    return str(session_id)
+
+
+def delete_session_by_token_hash(token_hash: str) -> None:
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute("DELETE FROM sessions WHERE token_hash = %s", (token_hash,))
+        conn.commit()
+
+
+def cleanup_expired_sessions() -> None:
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute("DELETE FROM sessions WHERE expires_at <= NOW()")
+        conn.commit()
+
+
+def count_users() -> int:
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT COUNT(*) FROM users")
+            row = cur.fetchone()
+    assert row is not None
+    return int(row[0])
+
+
 # --- Conversations (Milestone 3) ---
 
 
@@ -383,7 +503,10 @@ def _title_from_message(message: str) -> str:
     return text[:77] + "..."
 
 
-def create_conversation(first_user_message: str | None = None) -> str:
+def create_conversation(
+    first_user_message: str | None = None,
+    started_by_user_id: str | None = None,
+) -> str:
     """Create a conversation; optional first message sets the title."""
     conv_id = uuid4()
     title = (
@@ -395,10 +518,10 @@ def create_conversation(first_user_message: str | None = None) -> str:
         with conn.cursor() as cur:
             cur.execute(
                 """
-                INSERT INTO conversations (id, title)
-                VALUES (%s, %s)
+                INSERT INTO conversations (id, title, started_by_user_id)
+                VALUES (%s, %s, %s)
                 """,
-                (conv_id, title),
+                (conv_id, title, started_by_user_id),
             )
         conn.commit()
     return str(conv_id)
@@ -410,9 +533,11 @@ def list_conversations() -> list[ConversationSummary]:
         with conn.cursor() as cur:
             cur.execute(
                 """
-                SELECT id, title, created_at, updated_at
-                FROM conversations
-                ORDER BY updated_at DESC
+                SELECT c.id, c.title, c.created_at, c.updated_at,
+                       u.id, u.username, u.display_name
+                FROM conversations c
+                LEFT JOIN users u ON u.id = c.started_by_user_id
+                ORDER BY c.updated_at DESC
                 """
             )
             rows = cur.fetchall()
@@ -423,6 +548,7 @@ def list_conversations() -> list[ConversationSummary]:
             title=row[1],
             created_at=row[2],
             updated_at=row[3],
+            started_by=_user_ref_from_row(row[4], row[5], row[6]),
         )
         for row in rows
     ]
@@ -442,9 +568,11 @@ def get_conversation(conversation_id: str) -> ConversationDetail | None:
         with conn.cursor() as cur:
             cur.execute(
                 """
-                SELECT id, title, created_at, updated_at
-                FROM conversations
-                WHERE id = %s
+                SELECT c.id, c.title, c.created_at, c.updated_at,
+                       u.id, u.username, u.display_name
+                FROM conversations c
+                LEFT JOIN users u ON u.id = c.started_by_user_id
+                WHERE c.id = %s
                 """,
                 (conversation_id,),
             )
@@ -454,10 +582,12 @@ def get_conversation(conversation_id: str) -> ConversationDetail | None:
 
             cur.execute(
                 """
-                SELECT id, role, content, citations, created_at
-                FROM conversation_messages
-                WHERE conversation_id = %s
-                ORDER BY created_at ASC
+                SELECT m.id, m.role, m.content, m.citations, m.created_at,
+                       u.id, u.username, u.display_name
+                FROM conversation_messages m
+                LEFT JOIN users u ON u.id = m.author_user_id
+                WHERE m.conversation_id = %s
+                ORDER BY m.created_at ASC
                 """,
                 (conversation_id,),
             )
@@ -470,6 +600,7 @@ def get_conversation(conversation_id: str) -> ConversationDetail | None:
             content=m[2],
             citations=_parse_citations(m[3]),
             created_at=m[4],
+            author=_user_ref_from_row(m[5], m[6], m[7]),
         )
         for m in msg_rows
     ]
@@ -479,6 +610,7 @@ def get_conversation(conversation_id: str) -> ConversationDetail | None:
         title=row[1],
         created_at=row[2],
         updated_at=row[3],
+        started_by=_user_ref_from_row(row[4], row[5], row[6]),
         messages=messages,
     )
 
@@ -498,6 +630,7 @@ def append_message(
     role: str,
     content: str,
     citations: list[Citation] | None = None,
+    author_user_id: str | None = None,
 ) -> str:
     """Append a user or assistant message; returns message id."""
     msg_id = uuid4()
@@ -509,11 +642,11 @@ def append_message(
             cur.execute(
                 """
                 INSERT INTO conversation_messages (
-                    id, conversation_id, role, content, citations
+                    id, conversation_id, role, content, citations, author_user_id
                 )
-                VALUES (%s, %s, %s, %s, %s)
+                VALUES (%s, %s, %s, %s, %s, %s)
                 """,
-                (msg_id, conversation_id, role, content, citations_json),
+                (msg_id, conversation_id, role, content, citations_json, author_user_id),
             )
             cur.execute(
                 """

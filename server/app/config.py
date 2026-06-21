@@ -47,6 +47,9 @@ class Settings:
     ollama_cloud_chat_model: str
     ollama_cloud_base_url: str
     ollama_cloud_api_key: str | None
+    session_secret: str
+    session_max_age_days: int
+    cookie_secure: bool
     uploads_dir: Path
 
 
@@ -55,11 +58,13 @@ settings = Settings(
     ollama_base_url=os.getenv("OLLAMA_BASE_URL", "http://localhost:11434"),
     ollama_embed_model=os.getenv("OLLAMA_EMBED_MODEL", "embeddinggemma:latest"),
     ollama_llm_mode=_resolve_llm_mode(),
-    # Local: gemma4. Cloud: gemma4:31b on ollama.com — separate names per mode.
     ollama_local_chat_model=os.getenv("OLLAMA_LOCAL_CHAT_MODEL")
     or os.getenv("OLLAMA_CHAT_MODEL", "gemma4"),
     ollama_cloud_chat_model=os.getenv("OLLAMA_CLOUD_CHAT_MODEL", "gemma4:31b"),
     ollama_cloud_base_url=os.getenv("OLLAMA_CLOUD_BASE_URL", "https://ollama.com"),
     ollama_cloud_api_key=_resolve_cloud_api_key(),
+    session_secret=os.getenv("SESSION_SECRET", "dev-insecure-change-me"),
+    session_max_age_days=int(os.getenv("SESSION_MAX_AGE_DAYS", "7")),
+    cookie_secure=os.getenv("COOKIE_SECURE", "false").lower() == "true",
     uploads_dir=SERVER_ROOT / "data" / "uploads",
 )

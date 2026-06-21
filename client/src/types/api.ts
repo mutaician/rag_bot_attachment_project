@@ -1,8 +1,5 @@
 /**
  * API contract — TypeScript mirror of server/app/schemas.py
- *
- * Keep these types in sync with the Python Pydantic models.
- * fetch() returns plain JSON strings; these types document the expected shape.
  */
 
 /** Indexing lifecycle for an uploaded document. */
@@ -14,7 +11,6 @@ export interface Document {
   filename: string;
   version: number;
   status: DocumentStatus;
-  /** ISO 8601 datetime string from the API, e.g. "2026-06-01T12:00:00Z" */
   updated_at: string;
 }
 
@@ -29,7 +25,6 @@ export interface Citation {
 /** Body sent when the user submits a chat message. */
 export interface ChatRequest {
   message: string;
-  /** Omit or null to start a new conversation. */
   conversation_id?: string | null;
 }
 
@@ -41,14 +36,40 @@ export type ChatStreamEvent =
   | { type: 'done'; conversation_id: string }
   | { type: 'error'; message: string };
 
-/** Simple liveness check — confirms the API is running. */
 export interface HealthResponse {
   status: string;
 }
 
-/** Returned after a successful multipart upload. */
 export interface UploadResponse {
   document_ids: string[];
+}
+
+export interface UserRef {
+  id: string;
+  username: string;
+  display_name: string;
+}
+
+export interface AuthUser {
+  id: string;
+  username: string;
+  display_name: string;
+}
+
+export interface LoginRequest {
+  username: string;
+  password: string;
+}
+
+export interface LlmModeResponse {
+  mode: 'local' | 'cloud';
+}
+
+export interface SystemCapabilities {
+  embed: boolean;
+  local_chat: boolean;
+  cloud_chat: boolean;
+  cloud_configured: boolean;
 }
 
 /** One row in the conversation sidebar / list. */
@@ -57,6 +78,7 @@ export interface ConversationSummary {
   title: string;
   created_at: string;
   updated_at: string;
+  started_by?: UserRef | null;
 }
 
 /** A single message in a conversation thread. */
@@ -66,6 +88,7 @@ export interface ConversationMessage {
   content: string;
   citations?: Citation[] | null;
   created_at: string;
+  author?: UserRef | null;
 }
 
 /** Full conversation with message history. */
@@ -74,5 +97,6 @@ export interface ConversationDetail {
   title: string;
   created_at: string;
   updated_at: string;
+  started_by?: UserRef | null;
   messages: ConversationMessage[];
 }
