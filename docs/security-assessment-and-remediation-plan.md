@@ -232,7 +232,7 @@ P1: This mutates deployment-wide state and should require admin role.
 
 ---
 
-## Instructor note
+## Quick note
 
 Treat the P0 findings as release blockers. You should demonstrate:
 1) threat model,
