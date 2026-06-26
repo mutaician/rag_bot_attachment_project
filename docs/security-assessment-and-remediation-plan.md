@@ -1,6 +1,6 @@
 # Security Assessment and Remediation Plan
 
-Audience: instructors and student developers.
+Audience: Student developers.
 
 This document is intentionally direct. These are not theoretical concerns; several are immediately exploitable by any authenticated user.
 
@@ -234,7 +234,7 @@ P1: This mutates deployment-wide state and should require admin role.
 
 ## Instructor note
 
-Treat the P0 findings as release blockers. Students should demonstrate:
+Treat the P0 findings as release blockers. You should demonstrate:
 1) threat model,
 2) secure-by-default authorization boundaries,
 3) regression tests proving isolation between users.
