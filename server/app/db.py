@@ -16,11 +16,13 @@ import psycopg
 from psycopg.types.json import Json
 
 from app.config import settings
+from app.auth.policies import can_delete_conversation, can_delete_document, can_read_conversation
 from app.schemas import (
     Citation,
     ConversationDetail,
     ConversationMessage,
     ConversationSummary,
+    ConversationVisibility,
     Document,
     DocumentStatus,
     UserRef,
@@ -84,12 +86,40 @@ def get_connection() -> Iterator[psycopg.Connection]:
         yield conn
 
 
-def list_documents() -> list[Document]:
-    """
-    Return visible documents (not soft-deleted), newest first.
+def list_documents(user_id: str) -> list[Document]:
+    """Return visible documents with ownership metadata for the current user."""
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT d.id, d.filename, d.version, d.status, d.updated_at,
+                       d.uploaded_by_user_id, u.username, u.display_name
+                FROM documents d
+                LEFT JOIN users u ON u.id = d.uploaded_by_user_id
+                WHERE d.deleted_at IS NULL
+                ORDER BY d.updated_at DESC
+                """
+            )
+            rows = cur.fetchall()
 
-    Maps Postgres rows → Pydantic Document models for the API response.
-    """
+    return [
+        Document(
+            id=str(row[0]),
+            filename=row[1],
+            version=row[2],
+            status=DocumentStatus(row[3]),
+            updated_at=row[4],
+            uploaded_by=_user_ref_from_row(row[5], row[6], row[7]),
+            can_delete=can_delete_document(
+                str(row[5]) if row[5] is not None else None, user_id
+            ),
+        )
+        for row in rows
+    ]
+
+
+def list_document_inventory() -> list[Document]:
+    """All visible documents for RAG inventory (team-wide library)."""
     with get_connection() as conn:
         with conn.cursor() as cur:
             cur.execute(
@@ -136,23 +166,21 @@ def create_document_with_job(
     filename: str,
     version: int,
     storage_path: str,
+    uploaded_by_user_id: str,
 ) -> str:
-    """
-    Insert a new document (status=pending) and enqueue an indexing job.
-
-    Returns the document id as a string for the API response.
-    """
+    """Insert a new document (status=pending) and enqueue an indexing job."""
     job_id = uuid4()
     with get_connection() as conn:
         with conn.cursor() as cur:
             cur.execute(
                 """
                 INSERT INTO documents (
-                    id, filename, version, status, storage_path, updated_at
+                    id, filename, version, status, storage_path,
+                    uploaded_by_user_id, updated_at
                 )
-                VALUES (%s, %s, %s, 'pending', %s, NOW())
+                VALUES (%s, %s, %s, 'pending', %s, %s, NOW())
                 """,
-                (document_id, filename, version, storage_path),
+                (document_id, filename, version, storage_path, uploaded_by_user_id),
             )
             cur.execute(
                 """
@@ -219,6 +247,24 @@ def soft_delete_document(document_id: str) -> bool:
             _compact_active_versions(cur, original_filename)
         conn.commit()
     return True
+
+
+def get_document_uploaded_by(document_id: str) -> str | None:
+    """Return uploader user id for an active document, or None if missing."""
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT uploaded_by_user_id
+                FROM documents
+                WHERE id = %s AND deleted_at IS NULL
+                """,
+                (document_id,),
+            )
+            row = cur.fetchone()
+    if row is None or row[0] is None:
+        return None
+    return str(row[0])
 
 
 def hard_delete_document(document_id: str) -> bool:
@@ -506,6 +552,7 @@ def _title_from_message(message: str) -> str:
 def create_conversation(
     first_user_message: str | None = None,
     started_by_user_id: str | None = None,
+    visibility: str = "team",
 ) -> str:
     """Create a conversation; optional first message sets the title."""
     conv_id = uuid4()
@@ -518,40 +565,51 @@ def create_conversation(
         with conn.cursor() as cur:
             cur.execute(
                 """
-                INSERT INTO conversations (id, title, started_by_user_id)
-                VALUES (%s, %s, %s)
+                INSERT INTO conversations (
+                    id, title, started_by_user_id, visibility
+                )
+                VALUES (%s, %s, %s, %s)
                 """,
-                (conv_id, title, started_by_user_id),
+                (conv_id, title, started_by_user_id, visibility),
             )
         conn.commit()
     return str(conv_id)
 
 
-def list_conversations() -> list[ConversationSummary]:
-    """All conversations, most recently updated first."""
+def _conversation_summary_from_row(row: tuple, user_id: str) -> ConversationSummary:
+    started_by = _user_ref_from_row(row[4], row[5], row[6])
+    started_by_id = started_by.id if started_by else None
+    visibility = row[7]
+    return ConversationSummary(
+        id=str(row[0]),
+        title=row[1],
+        created_at=row[2],
+        updated_at=row[3],
+        started_by=started_by,
+        visibility=ConversationVisibility(visibility),
+        can_delete=can_delete_conversation(started_by_id, user_id),
+    )
+
+
+def list_conversations(user_id: str) -> list[ConversationSummary]:
+    """Conversations visible to the user: all team threads + own private threads."""
     with get_connection() as conn:
         with conn.cursor() as cur:
             cur.execute(
                 """
                 SELECT c.id, c.title, c.created_at, c.updated_at,
-                       u.id, u.username, u.display_name
+                       u.id, u.username, u.display_name, c.visibility
                 FROM conversations c
                 LEFT JOIN users u ON u.id = c.started_by_user_id
+                WHERE c.visibility = 'team'
+                   OR c.started_by_user_id = %s
                 ORDER BY c.updated_at DESC
-                """
+                """,
+                (user_id,),
             )
             rows = cur.fetchall()
 
-    return [
-        ConversationSummary(
-            id=str(row[0]),
-            title=row[1],
-            created_at=row[2],
-            updated_at=row[3],
-            started_by=_user_ref_from_row(row[4], row[5], row[6]),
-        )
-        for row in rows
-    ]
+    return [_conversation_summary_from_row(row, user_id) for row in rows]
 
 
 def _parse_citations(raw: object) -> list[Citation] | None:
@@ -562,14 +620,15 @@ def _parse_citations(raw: object) -> list[Citation] | None:
     return None
 
 
-def get_conversation(conversation_id: str) -> ConversationDetail | None:
-    """Load a conversation and its messages, or None if missing."""
+def get_conversation(conversation_id: str, user_id: str) -> ConversationDetail | None:
+    """Load a conversation if the user may read it; otherwise None."""
     with get_connection() as conn:
         with conn.cursor() as cur:
             cur.execute(
                 """
                 SELECT c.id, c.title, c.created_at, c.updated_at,
-                       u.id, u.username, u.display_name
+                       u.id, u.username, u.display_name,
+                       c.visibility, c.started_by_user_id
                 FROM conversations c
                 LEFT JOIN users u ON u.id = c.started_by_user_id
                 WHERE c.id = %s
@@ -578,6 +637,11 @@ def get_conversation(conversation_id: str) -> ConversationDetail | None:
             )
             row = cur.fetchone()
             if row is None:
+                return None
+
+            visibility = row[7]
+            started_by_id = str(row[8]) if row[8] is not None else None
+            if not can_read_conversation(visibility, started_by_id, user_id):
                 return None
 
             cur.execute(
@@ -605,24 +669,50 @@ def get_conversation(conversation_id: str) -> ConversationDetail | None:
         for m in msg_rows
     ]
 
+    started_by = _user_ref_from_row(row[4], row[5], row[6])
     return ConversationDetail(
         id=str(row[0]),
         title=row[1],
         created_at=row[2],
         updated_at=row[3],
-        started_by=_user_ref_from_row(row[4], row[5], row[6]),
+        started_by=started_by,
+        visibility=ConversationVisibility(visibility),
+        can_delete=can_delete_conversation(started_by_id, user_id),
         messages=messages,
     )
 
 
-def delete_conversation(conversation_id: str) -> bool:
-    """Permanently delete a conversation and its messages."""
+def delete_conversation(conversation_id: str, user_id: str) -> str:
+    """
+    Delete a conversation only if the user started it.
+
+    Returns: 'deleted', 'not_found', or 'forbidden'.
+    """
     with get_connection() as conn:
         with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT started_by_user_id, visibility
+                FROM conversations
+                WHERE id = %s
+                """,
+                (conversation_id,),
+            )
+            row = cur.fetchone()
+            if row is None:
+                return "not_found"
+
+            started_by_id = str(row[0]) if row[0] is not None else None
+            visibility = row[1]
+
+            if visibility == "private" and started_by_id != user_id:
+                return "not_found"
+            if started_by_id != user_id:
+                return "forbidden"
+
             cur.execute("DELETE FROM conversations WHERE id = %s", (conversation_id,))
-            deleted = cur.rowcount > 0
         conn.commit()
-    return deleted
+    return "deleted"
 
 
 def append_message(

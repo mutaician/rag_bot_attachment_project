@@ -15,10 +15,25 @@ from pydantic import BaseModel, Field
 class DocumentStatus(str, Enum):
     """Indexing lifecycle for an uploaded document."""
 
-    PENDING = "pending"      # uploaded, waiting for worker
-    INDEXING = "indexing"    # worker is chunking + embedding
-    READY = "ready"          # searchable in the vector DB
-    FAILED = "failed"        # ingestion error
+    PENDING = "pending"
+    INDEXING = "indexing"
+    READY = "ready"
+    FAILED = "failed"
+
+
+class ConversationVisibility(str, Enum):
+    """Who can read a conversation thread."""
+
+    TEAM = "team"
+    PRIVATE = "private"
+
+
+class UserRef(BaseModel):
+    """Lightweight user reference for attribution."""
+
+    id: str
+    username: str
+    display_name: str
 
 
 class Document(BaseModel):
@@ -29,6 +44,8 @@ class Document(BaseModel):
     version: int
     status: DocumentStatus
     updated_at: datetime
+    uploaded_by: UserRef | None = None
+    can_delete: bool = False
 
 
 class Citation(BaseModel):
@@ -44,7 +61,8 @@ class ChatRequest(BaseModel):
     """Body sent when the user submits a chat message."""
 
     message: str = Field(..., min_length=1)
-    conversation_id: str | None = None  # None = start a new conversation
+    conversation_id: str | None = None
+    visibility: ConversationVisibility = ConversationVisibility.TEAM
 
 
 class ChatResponse(BaseModel):
@@ -52,14 +70,6 @@ class ChatResponse(BaseModel):
 
     answer: str
     citations: list[Citation]
-
-
-class UserRef(BaseModel):
-    """Lightweight user reference for attribution."""
-
-    id: str
-    username: str
-    display_name: str
 
 
 class ConversationSummary(BaseModel):
@@ -70,6 +80,8 @@ class ConversationSummary(BaseModel):
     created_at: datetime
     updated_at: datetime
     started_by: UserRef | None = None
+    visibility: ConversationVisibility = ConversationVisibility.TEAM
+    can_delete: bool = False
 
 
 class ConversationMessage(BaseModel):
@@ -91,6 +103,8 @@ class ConversationDetail(BaseModel):
     created_at: datetime
     updated_at: datetime
     started_by: UserRef | None = None
+    visibility: ConversationVisibility = ConversationVisibility.TEAM
+    can_delete: bool = False
     messages: list[ConversationMessage]
 
 

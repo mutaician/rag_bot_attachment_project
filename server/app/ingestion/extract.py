@@ -9,6 +9,8 @@ from pathlib import Path
 
 from pypdf import PdfReader
 
+from app.config import settings
+
 
 @dataclass(frozen=True)
 class TextBlock:
@@ -40,6 +42,12 @@ def extract_document(path: str | Path) -> list[TextBlock]:
 def _extract_pdf(path: Path) -> list[TextBlock]:
     """Pull text from each PDF page (no OCR — scanned images stay empty)."""
     reader = PdfReader(path)
+    page_count = len(reader.pages)
+    if page_count > settings.max_pdf_pages:
+        raise ValueError(
+            f"PDF has {page_count} pages; maximum allowed is {settings.max_pdf_pages}"
+        )
+
     blocks: list[TextBlock] = []
 
     for page_num, page in enumerate(reader.pages, start=1):

@@ -12,6 +12,7 @@ from fastapi.responses import StreamingResponse
 
 from app import db
 from app.auth.deps import CurrentUser, get_current_user
+from app.auth.policies import can_write_conversation
 from app.rag.agent import run_agent_stream
 from app.schemas import ChatRequest, Citation
 
@@ -42,10 +43,21 @@ def _resolve_conversation(request: ChatRequest, user_id: str) -> str:
     """Create or validate conversation; does not persist the user message yet."""
     if request.conversation_id:
         conv_id = _parse_conversation_id(request.conversation_id)
-        if db.get_conversation(conv_id) is None:
+        conversation = db.get_conversation(conv_id, user_id)
+        if conversation is None:
             raise HTTPException(status_code=404, detail="Conversation not found")
+        if not can_write_conversation(
+            conversation.visibility.value,
+            conversation.started_by.id if conversation.started_by else None,
+            user_id,
+        ):
+            raise HTTPException(status_code=403, detail="Cannot post to this conversation")
         return conv_id
-    return db.create_conversation(request.message, started_by_user_id=user_id)
+    return db.create_conversation(
+        request.message,
+        started_by_user_id=user_id,
+        visibility=request.visibility.value,
+    )
 
 
 async def _chat_events(

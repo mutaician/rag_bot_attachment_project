@@ -6,7 +6,7 @@ import {
   getConversations,
   streamChat,
 } from '../api/client'
-import type { Citation, ConversationSummary } from '../types/api'
+import type { Citation, ConversationSummary, ConversationVisibility } from '../types/api'
 import ChatMessage, { type ChatMessageData } from '../components/ChatMessage'
 import ConversationSidebar from '../components/ConversationSidebar'
 import LlmModeToggle from '../components/LlmModeToggle'
@@ -28,7 +28,13 @@ export default function Chat() {
   const [loading, setLoading] = useState(false)
   const [status, setStatus] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const [threadMeta, setThreadMeta] = useState<{ startedBy?: string } | null>(null)
+  const [threadMeta, setThreadMeta] = useState<{
+    startedBy?: string
+    visibility?: ConversationVisibility
+    canDelete?: boolean
+  } | null>(null)
+  const [newThreadVisibility, setNewThreadVisibility] =
+    useState<ConversationVisibility>('team')
   const bottomRef = useRef<HTMLDivElement>(null)
 
   const activeId = routeId ?? null
@@ -50,6 +56,8 @@ export default function Chat() {
       const detail = await getConversation(id)
       setThreadMeta({
         startedBy: detail.started_by?.display_name,
+        visibility: detail.visibility,
+        canDelete: detail.can_delete,
       })
       setMessages(
         detail.messages.map((m) => ({
@@ -88,6 +96,7 @@ export default function Chat() {
     navigate('/chat')
     setMessages([])
     setThreadMeta(null)
+    setNewThreadVisibility('team')
     setError(null)
     setStatus(null)
   }
@@ -138,6 +147,7 @@ export default function Chat() {
       for await (const event of streamChat({
         message: text,
         conversation_id: activeId,
+        visibility: activeId ? undefined : newThreadVisibility,
       })) {
         if (event.type === 'token') {
           answer += event.content
@@ -202,6 +212,7 @@ export default function Chat() {
           {threadMeta?.startedBy && (
             <p className="mt-1 font-mono text-[10px] uppercase tracking-[0.1em] text-faint">
               Started by {threadMeta.startedBy}
+              {threadMeta.visibility === 'private' && ' · Private'}
             </p>
           )}
           <LlmModeToggle />
@@ -244,6 +255,30 @@ export default function Chat() {
           onSubmit={(e) => void handleSubmit(e)}
           className="shrink-0 border-t border-line bg-surface px-5 py-4 md:px-8"
         >
+          {!activeId && (
+            <div className="mx-auto mb-3 flex max-w-2xl items-center gap-3">
+              <span className="font-mono text-[10px] uppercase tracking-[0.12em] text-faint">
+                New thread
+              </span>
+              <div className="inline-flex rounded-md border border-line p-0.5" role="group">
+                {(['team', 'private'] as const).map((option) => (
+                  <button
+                    key={option}
+                    type="button"
+                    onClick={() => setNewThreadVisibility(option)}
+                    className={[
+                      'rounded px-3 py-1 font-mono text-[11px] uppercase tracking-wide',
+                      newThreadVisibility === option
+                        ? 'bg-accent-soft font-medium text-ink'
+                        : 'text-muted hover:text-ink',
+                    ].join(' ')}
+                  >
+                    {option}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
           <div className="mx-auto flex max-w-2xl gap-2">
             <label htmlFor="chat-input" className="sr-only">
               Your question

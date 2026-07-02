@@ -10,11 +10,12 @@ CREATE EXTENSION IF NOT EXISTS vector;
 CREATE TABLE documents (
     id            UUID PRIMARY KEY,
     filename      TEXT NOT NULL,
-    version       INT NOT NULL,                    -- 1, 2, 3… per filename
-    status        TEXT NOT NULL,                   -- pending | indexing | ready | failed
-    storage_path  TEXT NOT NULL,                   -- path to raw file on disk
-    error_message TEXT,                            -- set when status = failed
-    deleted_at    TIMESTAMPTZ,                     -- soft delete: non-null = hidden
+    version       INT NOT NULL,
+    status        TEXT NOT NULL,
+    storage_path  TEXT NOT NULL,
+    error_message TEXT,
+    deleted_at    TIMESTAMPTZ,
+    uploaded_by_user_id UUID REFERENCES users(id),
     updated_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     UNIQUE (filename, version)
 );
@@ -86,6 +87,7 @@ CREATE TABLE conversations (
     id                   UUID PRIMARY KEY,
     title                TEXT NOT NULL DEFAULT 'New conversation',
     started_by_user_id   UUID REFERENCES users(id),
+    visibility           TEXT NOT NULL DEFAULT 'team' CHECK (visibility IN ('team', 'private')),
     created_at           TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at           TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );

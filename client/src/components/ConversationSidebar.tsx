@@ -73,26 +73,29 @@ export default function ConversationSidebar({
                   ].join(' ')}
                 >
                   <span className="line-clamp-2 text-sm leading-snug">{c.title}</span>
-                  {c.started_by && (
-                    <span className="mt-0.5 block text-[10px] text-faint">
-                      {c.started_by.display_name}
-                    </span>
-                  )}
+                  <span className="mt-0.5 flex items-center gap-2 text-[10px] text-faint">
+                    {c.visibility === 'private' && (
+                      <span className="font-mono uppercase tracking-wide">Private</span>
+                    )}
+                    {c.started_by && <span>{c.started_by.display_name}</span>}
+                  </span>
                   <span className="mt-1 block font-mono text-[10px] text-faint">
                     {formatWhen(c.updated_at)}
                   </span>
                 </button>
-                <button
-                  type="button"
-                  aria-label="Delete thread"
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    onDelete(c.id)
-                  }}
-                  className="absolute right-2 top-2 rounded px-1.5 py-0.5 font-mono text-[10px] text-faint opacity-0 transition-opacity hover:text-accent group-hover:opacity-100 focus-visible:opacity-100 focus-visible:outline-2 focus-visible:outline-accent"
-                >
-                  ×
-                </button>
+                {c.can_delete && (
+                  <button
+                    type="button"
+                    aria-label="Delete thread"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      onDelete(c.id)
+                    }}
+                    className="absolute right-2 top-2 rounded px-1.5 py-0.5 font-mono text-[10px] text-faint opacity-0 transition-opacity hover:text-accent group-hover:opacity-100 focus-visible:opacity-100 focus-visible:outline-2 focus-visible:outline-accent"
+                  >
+                    ×
+                  </button>
+                )}
               </li>
             )
           })}
