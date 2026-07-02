@@ -12,6 +12,8 @@ export interface Document {
   version: number;
   status: DocumentStatus;
   updated_at: string;
+  uploaded_by?: UserRef | null;
+  can_delete?: boolean;
 }
 
 /** A source chunk the AI used to ground its answer. */
@@ -22,10 +24,13 @@ export interface Citation {
   page?: number | null;
 }
 
+export type ConversationVisibility = 'team' | 'private';
+
 /** Body sent when the user submits a chat message. */
 export interface ChatRequest {
   message: string;
   conversation_id?: string | null;
+  visibility?: ConversationVisibility;
 }
 
 /** SSE events from POST /chat */
@@ -79,6 +84,8 @@ export interface ConversationSummary {
   created_at: string;
   updated_at: string;
   started_by?: UserRef | null;
+  visibility?: ConversationVisibility;
+  can_delete?: boolean;
 }
 
 /** A single message in a conversation thread. */
@@ -98,5 +105,7 @@ export interface ConversationDetail {
   created_at: string;
   updated_at: string;
   started_by?: UserRef | null;
+  visibility?: ConversationVisibility;
+  can_delete?: boolean;
   messages: ConversationMessage[];
 }

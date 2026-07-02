@@ -17,6 +17,7 @@ If the Postgres volume already existed before auth, apply migrations:
 ```bash
 docker compose exec -T postgres psql -U rag_user -d rag_db < server/db/migrations/002_users_sessions.sql
 docker compose exec -T postgres psql -U rag_user -d rag_db < server/db/migrations/003_chat_attribution.sql
+docker compose exec -T postgres psql -U rag_user -d rag_db < server/db/migrations/004_p0_security.sql
 ```
 
 **Create a user** (no public registration):
@@ -83,8 +84,20 @@ Open http://localhost:8080
 | `SESSION_SECRET` | Session cookie signing (change in production) |
 | `COOKIE_SECURE` | `true` when serving over HTTPS |
 | `CORS_ORIGINS` | Comma-separated dev origins (default `http://localhost:5173`) |
+| `MAX_UPLOAD_BYTES` | Max upload size in bytes (default 25 MB) |
+| `MAX_PDF_PAGES` | Max PDF pages to parse (default 200) |
+| `LOGIN_MAX_ATTEMPTS` | Failed logins before lockout (default 5) |
+| `LOGIN_RATE_WINDOW_SECONDS` | Rate limit window in seconds (default 300) |
 
 Chat LLM mode can be switched at runtime by any signed-in user via **Ask → Chat model (team)** — one setting per deployment.
+
+**Authorization model:** Documents and team threads are shared library-wide. Private threads are visible only to their starter. Only the uploader may delete a document; only the thread starter may delete a conversation.
+
+Run security regression tests:
+
+```bash
+cd server && uv run pytest tests/ -v
+```
 
 ## Verify
 

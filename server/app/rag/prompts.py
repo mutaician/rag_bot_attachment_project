@@ -21,7 +21,7 @@ Rules:
 
 def build_system_message() -> dict[str, str]:
     """System message with live document inventory (ready docs only)."""
-    docs = db.list_documents()
+    docs = db.list_document_inventory()
     ready = [d for d in docs if d.status == DocumentStatus.READY]
     if ready:
         lines = [f"- {d.filename} (v{d.version})" for d in ready]

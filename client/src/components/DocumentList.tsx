@@ -54,14 +54,16 @@ export default function DocumentList({
             >
               {STATUS_LABEL[doc.status]}
             </span>
-            <button
-              type="button"
-              onClick={() => void onDelete(doc.id)}
-              disabled={deletingId === doc.id}
-              className="text-xs text-faint hover:text-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:opacity-50"
-            >
-              {deletingId === doc.id ? '…' : 'Remove'}
-            </button>
+            {doc.can_delete && (
+              <button
+                type="button"
+                onClick={() => void onDelete(doc.id)}
+                disabled={deletingId === doc.id}
+                className="text-xs text-faint hover:text-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:opacity-50"
+              >
+                {deletingId === doc.id ? '…' : 'Remove'}
+              </button>
+            )}
           </div>
         </li>
       ))}

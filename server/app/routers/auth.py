@@ -2,11 +2,16 @@
 
 from datetime import datetime, timedelta, timezone
 
-from fastapi import APIRouter, Cookie, Depends, HTTPException, Response, status
+from fastapi import APIRouter, Cookie, Depends, HTTPException, Request, Response, status
 
 from app import db
 from app.auth.deps import CurrentUser, get_current_user
 from app.auth.passwords import verify_password
+from app.auth.rate_limit import (
+    check_login_allowed,
+    clear_login_failures,
+    record_login_failure,
+)
 from app.auth.sessions import COOKIE_NAME, hash_token, new_session_token
 from app.config import settings
 from app.schemas import AuthUser, LoginRequest
@@ -35,19 +40,25 @@ def _clear_session_cookie(response: Response) -> None:
 
 
 @router.post("/login", response_model=AuthUser)
-def login(body: LoginRequest, response: Response) -> AuthUser:
+def login(body: LoginRequest, request: Request, response: Response) -> AuthUser:
     """Authenticate with username/password; sets an HttpOnly session cookie."""
+    check_login_allowed(request, body.username)
+
     user = db.get_user_by_username(body.username)
     if user is None or not user["is_active"]:
+        record_login_failure(request, body.username)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid credentials",
         )
     if not verify_password(body.password, user["password_hash"]):
+        record_login_failure(request, body.username)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid credentials",
         )
+
+    clear_login_failures(request, body.username)
 
     db.cleanup_expired_sessions()
     token = new_session_token()

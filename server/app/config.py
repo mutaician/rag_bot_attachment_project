@@ -51,6 +51,10 @@ class Settings:
     session_max_age_days: int
     cookie_secure: bool
     uploads_dir: Path
+    max_upload_bytes: int
+    max_pdf_pages: int
+    login_max_attempts: int
+    login_rate_window_seconds: int
 
 
 settings = Settings(
@@ -67,4 +71,8 @@ settings = Settings(
     session_max_age_days=int(os.getenv("SESSION_MAX_AGE_DAYS", "7")),
     cookie_secure=os.getenv("COOKIE_SECURE", "false").lower() == "true",
     uploads_dir=SERVER_ROOT / "data" / "uploads",
+    max_upload_bytes=int(os.getenv("MAX_UPLOAD_BYTES", str(25 * 1024 * 1024))),
+    max_pdf_pages=int(os.getenv("MAX_PDF_PAGES", "200")),
+    login_max_attempts=int(os.getenv("LOGIN_MAX_ATTEMPTS", "5")),
+    login_rate_window_seconds=int(os.getenv("LOGIN_RATE_WINDOW_SECONDS", "300")),
 )
